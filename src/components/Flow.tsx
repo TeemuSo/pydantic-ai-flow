@@ -69,6 +69,7 @@ const Flow = ({ nodeTypes }: FlowProps) => {
         onDragOver={onDragOver}
         onDrop={onDrop}
         nodeTypes={nodeTypes}
+        noDragClassName="nodrag"
         fitView
       >
         <Background />
