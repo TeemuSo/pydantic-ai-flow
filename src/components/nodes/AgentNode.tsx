@@ -13,10 +13,17 @@ import {
   IconButton,
   Stack,
   AppBar,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  CircularProgress,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 
 interface SystemPrompt {
   id: string;
@@ -70,8 +77,71 @@ const defaultConfig: AgentConfig = {
   totalTokensLimit: 4096,
 };
 
+interface RunDialogProps {
+  open: boolean;
+  onClose: () => void;
+  onRun: (prompt: string, apiKey: string) => Promise<void>;
+  modelProvider: string;
+}
+
+const RunDialog: React.FC<RunDialogProps> = ({ open, onClose, onRun, modelProvider }) => {
+  const [prompt, setPrompt] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+
+  const handleRun = async () => {
+    setIsRunning(true);
+    try {
+      await onRun(prompt, apiKey);
+      onClose();
+    } catch (error) {
+      console.error('Error running agent:', error);
+    } finally {
+      setIsRunning(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Run Agent</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2} sx={{ mt: 1 }}>
+          <TextField
+            fullWidth
+            label={`${modelProvider} API Key`}
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            type="password"
+          />
+          <TextField
+            fullWidth
+            label="Prompt"
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            multiline
+            rows={4}
+          />
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={isRunning}>Cancel</Button>
+        <Button 
+          onClick={handleRun} 
+          variant="contained" 
+          disabled={!prompt || !apiKey || isRunning}
+          startIcon={isRunning ? <CircularProgress size={20} /> : <PlayArrowIcon />}
+        >
+          {isRunning ? 'Running...' : 'Run'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const AgentNode = ({ data }: NodeProps) => {
   const [config, setConfig] = useState<AgentConfig>(data.config || defaultConfig);
+  const [runDialogOpen, setRunDialogOpen] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
 
   useEffect(() => {
     const validModels = MODEL_OPTIONS[config.modelProvider];
@@ -113,6 +183,51 @@ const AgentNode = ({ data }: NodeProps) => {
     }));
   };
 
+  const handleRunAgent = async (prompt: string, apiKey: string) => {
+    try {
+      const credentials = {
+        openai_api_key: config.modelProvider === 'openai' ? apiKey : null,
+        anthropic_api_key: config.modelProvider === 'anthropic' ? apiKey : null,
+        google_api_key: config.modelProvider === 'google-gla' ? apiKey : null,
+      };
+
+      const transformedConfig = {
+        label: config.label,
+        model_provider: config.modelProvider,
+        model_name: config.modelName,
+        temperature: config.temperature,
+        max_tokens: config.maxTokens,
+        system_prompts: config.systemPrompts.map(p => p.content),
+        response_tokens_limit: config.responseTokensLimit,
+        request_limit: config.requestLimit,
+        total_tokens_limit: config.totalTokensLimit,
+      };
+
+      const response = await fetch('http://localhost:8000/api/run-agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          config: transformedConfig,
+          credentials,
+          prompt,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.detail || 'Failed to run agent');
+      }
+
+      const data = await response.json();
+      setResult(data.result);
+    } catch (error) {
+      console.error('Error running agent:', error);
+      throw error;
+    }
+  };
+
   return (
     <Paper
       sx={{
@@ -138,7 +253,14 @@ const AgentNode = ({ data }: NodeProps) => {
         }}
       >
         <DragIndicatorIcon sx={{ mr: 1 }} />
-        <Typography variant="subtitle2">{config.label || 'Agent'}</Typography>
+        <Typography variant="subtitle2" sx={{ flexGrow: 1 }}>{config.label || 'Agent'}</Typography>
+        <IconButton 
+          size="small" 
+          onClick={() => setRunDialogOpen(true)}
+          sx={{ backgroundColor: 'primary.main', '&:hover': { backgroundColor: 'primary.dark' } }}
+        >
+          <PlayArrowIcon />
+        </IconButton>
       </AppBar>
 
       <Box sx={{ padding: 2 }} className="nodrag">
@@ -283,7 +405,21 @@ const AgentNode = ({ data }: NodeProps) => {
             placeholder="e.g., string[], boolean, etc."
           />
         </Stack>
+
+        {result && (
+          <Box sx={{ p: 2, mt: 2, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>Last Result:</Typography>
+            <Typography variant="body2">{result}</Typography>
+          </Box>
+        )}
       </Box>
+
+      <RunDialog
+        open={runDialogOpen}
+        onClose={() => setRunDialogOpen(false)}
+        onRun={handleRunAgent}
+        modelProvider={config.modelProvider}
+      />
 
       <Handle type="source" position={Position.Bottom} />
     </Paper>

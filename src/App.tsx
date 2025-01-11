@@ -6,6 +6,7 @@ import Flow from './components/Flow';
 import AgentNode from './components/nodes/AgentNode';
 import ToolNode from './components/nodes/ToolNode';
 import ResultNode from './components/nodes/ResultNode';
+import { APIKeyProvider, APIKeyConfig } from './components/APIKeyConfig';
 
 const nodeTypes = {
   agent: AgentNode,
@@ -15,14 +16,17 @@ const nodeTypes = {
 
 const App = () => {
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
-      <ReactFlowProvider>
-        <Sidebar />
-        <Box sx={{ flexGrow: 1, height: '100%' }}>
-          <Flow nodeTypes={nodeTypes} />
-        </Box>
-      </ReactFlowProvider>
-    </Box>
+    <APIKeyProvider>
+      <Box sx={{ display: 'flex', height: '100vh' }}>
+        <ReactFlowProvider>
+          <Sidebar />
+          <Box sx={{ flexGrow: 1, height: '100%' }}>
+            <Flow nodeTypes={nodeTypes} />
+          </Box>
+        </ReactFlowProvider>
+        <APIKeyConfig />
+      </Box>
+    </APIKeyProvider>
   );
 };
 
