@@ -19,34 +19,19 @@ import {
   DialogContent,
   DialogActions,
   CircularProgress,
+  FormGroup,
+  FormControlLabel,
+  Checkbox,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-
-interface SystemPrompt {
-  id: string;
-  content: string;
-}
+import { OutputStructure, OutputField, AgentConfig, NodeData, SystemPrompt } from '../../types/flow';
 
 interface ModelOption {
   value: string;
   label: string;
-}
-
-interface AgentConfig {
-  label: string;
-  modelProvider: 'openai' | 'anthropic' | 'google-gla';
-  modelName: string;
-  temperature: number;
-  maxTokens: number;
-  systemPrompts: SystemPrompt[];
-  responseTokensLimit: number;
-  requestLimit: number;
-  totalTokensLimit: number;
-  dependencyType?: string;
-  resultType?: string;
 }
 
 const MODEL_OPTIONS: Record<AgentConfig['modelProvider'], ModelOption[]> = {
@@ -138,10 +123,17 @@ const RunDialog: React.FC<RunDialogProps> = ({ open, onClose, onRun, modelProvid
   );
 };
 
-const AgentNode = ({ data }: NodeProps) => {
-  const [config, setConfig] = useState<AgentConfig>(data.config || defaultConfig);
+const AgentNode = ({ data }: NodeProps<NodeData>) => {
+  const [config, setConfig] = useState<AgentConfig>(() => {
+    // Initialize with default config if no config provided
+    if (!data.config) {
+      return defaultConfig;
+    }
+    return data.config;
+  });
   const [runDialogOpen, setRunDialogOpen] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [structuredOutput, setStructuredOutput] = useState<any>(null);
 
   useEffect(() => {
     const validModels = MODEL_OPTIONS[config.modelProvider];
@@ -149,6 +141,12 @@ const AgentNode = ({ data }: NodeProps) => {
       handleConfigChange('modelName', validModels[0].value);
     }
   }, [config.modelProvider]);
+
+  useEffect(() => {
+    if (data.onConfigChange) {
+      data.onConfigChange(config);
+    }
+  }, [config, data.onConfigChange]);
 
   const handleConfigChange = (field: keyof AgentConfig, value: any) => {
     setConfig((prev) => ({
@@ -183,6 +181,44 @@ const AgentNode = ({ data }: NodeProps) => {
     }));
   };
 
+  const addOutputField = () => {
+    const newField: OutputField = {
+      name: '',
+      type: 'str',
+      description: ''
+    };
+
+    setConfig(prev => ({
+      ...prev,
+      outputStructure: {
+        name: prev.outputStructure?.name || 'CustomOutput',
+        fields: [...(prev.outputStructure?.fields || []), newField]
+      }
+    }));
+  };
+
+  const updateOutputField = (index: number, field: Partial<OutputField>) => {
+    setConfig(prev => ({
+      ...prev,
+      outputStructure: {
+        name: prev.outputStructure?.name || 'CustomOutput',
+        fields: prev.outputStructure?.fields.map((f, i) => 
+          i === index ? { ...f, ...field } : f
+        ) || []
+      }
+    }));
+  };
+
+  const removeOutputField = (index: number) => {
+    setConfig(prev => ({
+      ...prev,
+      outputStructure: {
+        name: prev.outputStructure?.name || 'CustomOutput',
+        fields: prev.outputStructure?.fields.filter((_, i) => i !== index) || []
+      }
+    }));
+  };
+
   const handleRunAgent = async (prompt: string, apiKey: string) => {
     try {
       const credentials = {
@@ -201,7 +237,11 @@ const AgentNode = ({ data }: NodeProps) => {
         response_tokens_limit: config.responseTokensLimit,
         request_limit: config.requestLimit,
         total_tokens_limit: config.totalTokensLimit,
+        output_structure: config.outputStructure,
+        selected_output_fields: config.selectedOutputFields,
       };
+
+      console.log('Sending request with config:', transformedConfig);
 
       const response = await fetch('http://localhost:8000/api/run-agent', {
         method: 'POST',
@@ -222,6 +262,12 @@ const AgentNode = ({ data }: NodeProps) => {
 
       const data = await response.json();
       setResult(data.result);
+      setStructuredOutput(data.structured_output);
+      
+      // Update node data to persist the configuration
+      if (data.structured_output) {
+        handleConfigChange('selectedOutputFields', Object.keys(data.structured_output));
+      }
     } catch (error) {
       console.error('Error running agent:', error);
       throw error;
@@ -404,14 +450,116 @@ const AgentNode = ({ data }: NodeProps) => {
             size="small"
             placeholder="e.g., string[], boolean, etc."
           />
-        </Stack>
 
-        {result && (
-          <Box sx={{ p: 2, mt: 2, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
-            <Typography variant="subtitle2" gutterBottom>Last Result:</Typography>
-            <Typography variant="body2">{result}</Typography>
+          {/* Output Structure Configuration */}
+          <Box className="nodrag">
+            <Typography variant="subtitle2" gutterBottom>
+              Output Structure
+              <IconButton size="small" onClick={addOutputField}>
+                <AddIcon />
+              </IconButton>
+            </Typography>
+            
+            <TextField
+              fullWidth
+              size="small"
+              label="Structure Name"
+              value={config.outputStructure?.name || 'CustomOutput'}
+              onChange={(e) => setConfig(prev => ({
+                ...prev,
+                outputStructure: {
+                  name: e.target.value,
+                  fields: prev.outputStructure?.fields || []
+                }
+              }))}
+              sx={{ mb: 2 }}
+            />
+
+            {config.outputStructure?.fields.map((field, index) => (
+              <Box key={index} sx={{ display: 'flex', gap: 1, mb: 1 }}>
+                <TextField
+                  size="small"
+                  label="Field Name"
+                  value={field.name}
+                  onChange={(e) => updateOutputField(index, { name: e.target.value })}
+                />
+                <Select
+                  size="small"
+                  value={field.type}
+                  onChange={(e) => updateOutputField(index, { type: e.target.value })}
+                >
+                  <MenuItem value="str">String</MenuItem>
+                  <MenuItem value="int">Integer</MenuItem>
+                  <MenuItem value="float">Float</MenuItem>
+                  <MenuItem value="bool">Boolean</MenuItem>
+                  <MenuItem value="list[str]">String List</MenuItem>
+                  <MenuItem value="dict">Dictionary</MenuItem>
+                </Select>
+                <TextField
+                  size="small"
+                  label="Description"
+                  value={field.description || ''}
+                  onChange={(e) => updateOutputField(index, { description: e.target.value })}
+                />
+                <IconButton size="small" onClick={() => removeOutputField(index)}>
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            ))}
           </Box>
-        )}
+
+          {/* Result Display */}
+          {(result || structuredOutput) && (
+            <Box sx={{ p: 2, mt: 2, backgroundColor: 'rgba(0,0,0,0.05)', borderRadius: 1 }}>
+              <Typography variant="subtitle2" gutterBottom>Last Result:</Typography>
+              {result && (
+                <Typography variant="body2" sx={{ mb: 1 }}>{result}</Typography>
+              )}
+              {structuredOutput && (
+                <>
+                  <Typography variant="subtitle2" gutterBottom>Structured Output:</Typography>
+                  <Box component="pre" sx={{ 
+                    p: 1, 
+                    backgroundColor: 'rgba(0,0,0,0.03)', 
+                    borderRadius: 1,
+                    overflow: 'auto'
+                  }}>
+                    {JSON.stringify(structuredOutput, null, 2)}
+                  </Box>
+                  
+                  {/* Field Selection for Next Agent */}
+                  <Box sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Select Fields to Pass to Next Agent:
+                    </Typography>
+                    <FormGroup>
+                      {Object.keys(structuredOutput).map(field => (
+                        <FormControlLabel
+                          key={field}
+                          control={
+                            <Checkbox
+                              checked={config.selectedOutputFields?.includes(field) || false}
+                              onChange={(e) => {
+                                const selected = e.target.checked;
+                                setConfig(prev => ({
+                                  ...prev,
+                                  selectedOutputFields: selected
+                                    ? [...(prev.selectedOutputFields || []), field]
+                                    : (prev.selectedOutputFields || []).filter(f => f !== field)
+                                }));
+                              }}
+                            />
+                          }
+                          label={field}
+                        />
+                      ))}
+                    </FormGroup>
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+        </Stack>
       </Box>
 
       <RunDialog

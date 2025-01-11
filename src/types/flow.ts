@@ -1,9 +1,20 @@
-interface SystemPrompt {
+export interface OutputField {
+  name: string;
+  type: string;
+  description?: string;
+}
+
+export interface OutputStructure {
+  name: string;
+  fields: OutputField[];
+}
+
+export interface SystemPrompt {
   id: string;
   content: string;
 }
 
-interface AgentConfig {
+export interface AgentConfig {
   label: string;
   modelProvider: 'openai' | 'anthropic' | 'google-gla';
   modelName: string;
@@ -15,12 +26,15 @@ interface AgentConfig {
   totalTokensLimit: number;
   dependencyType?: string;
   resultType?: string;
+  outputStructure?: OutputStructure;
+  selectedOutputFields?: string[];
 }
 
-interface NodeData {
+export interface NodeData {
+  type: string;
   config?: AgentConfig;
-  label?: string;
-  type?: string;
+  onConfigChange?: (config: AgentConfig) => void;
 }
 
-export type { SystemPrompt, AgentConfig, NodeData }; 
+// Record type for structured output where values can be any primitive type
+export type StructuredOutput = Record<string, string | number | boolean | string[] | Record<string, any>>; 

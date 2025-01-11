@@ -19,11 +19,12 @@ import ReactFlow, {
   EdgeChange,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Box, Paper, Typography } from '@mui/material';
+import { Box, Paper, Typography, Button } from '@mui/material';
+import CodeIcon from '@mui/icons-material/Code';
 import { APIKeyContext } from './APIKeyConfig';
 import { InputPanel } from './InputPanel';
 import { ResultsPanel } from './ResultsPanel';
-import { NodeData } from '../types/flow';
+import { NodeData, AgentConfig, StructuredOutput } from '../types/flow';
 
 interface FlowProps {
   nodeTypes: NodeTypes;
@@ -33,7 +34,10 @@ interface FlowOutput {
   nodeId: string;
   result: string;
   error?: string | boolean;
-  metadata?: Record<string, any>;
+  metadata?: {
+    structured_output?: StructuredOutput;
+    [key: string]: any;
+  };
 }
 
 interface SystemPrompt {
@@ -101,6 +105,43 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
     event.dataTransfer.dropEffect = 'move';
   }, []);
 
+  const handleAgentConfigChange = useCallback((nodeId: string, newConfig: AgentConfig) => {
+    setNodes(nds => 
+      nds.map(node => {
+        if (node.id === nodeId) {
+          const updatedData: NodeData = {
+            type: node.data.type,
+            config: newConfig,
+            onConfigChange: (config: AgentConfig) => handleAgentConfigChange(node.id, config)
+          };
+          return {
+            ...node,
+            data: updatedData
+          };
+        }
+        return node;
+      })
+    );
+  }, []);
+
+  // Update initial nodes to include onConfigChange
+  useEffect(() => {
+    setNodes(nds =>
+      nds.map(node => {
+        const updatedData: NodeData = {
+          ...node.data,
+          onConfigChange: node.type === 'agent' 
+            ? (config: AgentConfig) => handleAgentConfigChange(node.id, config)
+            : undefined
+        };
+        return {
+          ...node,
+          data: updatedData
+        };
+      })
+    );
+  }, [handleAgentConfigChange]);
+
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
@@ -113,29 +154,34 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
         y: event.clientY,
       });
 
+      const nodeData: NodeData = {
+        type,
+        config: type === 'agent' ? {
+          label: `Agent ${nodes.length + 1}`,
+          modelProvider: 'openai',
+          modelName: 'gpt-4',
+          temperature: 0.7,
+          maxTokens: 2048,
+          systemPrompts: [{ id: '1', content: '' }],
+          responseTokensLimit: 2048,
+          requestLimit: 10,
+          totalTokensLimit: 4096,
+        } : undefined,
+        onConfigChange: type === 'agent' 
+          ? (config: AgentConfig) => handleAgentConfigChange(`${type}-${nodes.length + 1}`, config)
+          : undefined
+      };
+
       const newNode: Node<NodeData> = {
         id: `${type}-${nodes.length + 1}`,
         type,
         position,
-        data: { 
-          type,
-          config: type === 'agent' ? {
-            label: `Agent ${nodes.length + 1}`,
-            modelProvider: 'openai',
-            modelName: 'gpt-4',
-            temperature: 0.7,
-            maxTokens: 2048,
-            systemPrompts: [{ id: '1', content: '' }],
-            responseTokensLimit: 2048,
-            requestLimit: 10,
-            totalTokensLimit: 4096,
-          } : undefined
-        },
+        data: nodeData,
       };
 
       setNodes((nds) => [...nds, newNode]);
     },
-    [nodes, setNodes, screenToFlowPosition]
+    [nodes, setNodes, screenToFlowPosition, handleAgentConfigChange]
   );
 
   const processInput = async (input: string) => {
@@ -169,6 +215,7 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
       await Promise.all(startNodes.map(async (node) => {
         let currentNode = node;
         let currentInput = input;
+        let previousOutput: StructuredOutput | null = null;
 
         while (currentNode) {
           if (currentNode.type === 'agent' && currentNode.data?.config) {
@@ -178,24 +225,36 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
               google_api_key: apiKeys['google-gla'],
             };
 
+            // If we have previous output and selected fields, add them to the input
+            if (previousOutput && currentNode.data.config.selectedOutputFields?.length) {
+              const selectedData = currentNode.data.config.selectedOutputFields
+                .map(field => {
+                  // Use non-null assertion since we've checked it in the if condition
+                  const value = previousOutput![field];
+                  return `${field}: ${value !== undefined ? value : 'N/A'}`;
+                })
+                .join('\n');
+              currentInput = `${currentInput}\n\nContext from previous agent:\n${selectedData}`;
+            }
+
             const transformedConfig = {
               label: currentNode.data.config.label,
               model_provider: currentNode.data.config.modelProvider,
               model_name: currentNode.data.config.modelName,
               temperature: currentNode.data.config.temperature,
               max_tokens: currentNode.data.config.maxTokens,
-              system_prompts: currentNode.data.config.systemPrompts.map((p: SystemPrompt) => p.content).filter(Boolean),
+              system_prompts: currentNode.data.config.systemPrompts.map(p => p.content).filter(Boolean),
               response_tokens_limit: currentNode.data.config.responseTokensLimit,
               request_limit: currentNode.data.config.requestLimit,
               total_tokens_limit: currentNode.data.config.totalTokensLimit,
+              output_structure: currentNode.data.config.outputStructure,
+              selected_output_fields: currentNode.data.config.selectedOutputFields
             };
 
             console.log('Starting processInput function');
             console.log('Input:', currentInput);
             console.log('Node config:', transformedConfig);
             console.log('Credentials:', credentials);
-
-            console.log('Sending request with config:', transformedConfig);
 
             const response = await fetch('http://localhost:8000/api/run-agent', {
               method: 'POST',
@@ -210,35 +269,35 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
             });
 
             console.log('Response status:', response.status);
-            console.log('Response headers:', response.headers);
-
-            const data = await response.json();
-            console.log('Response data:', data);
 
             if (!response.ok) {
-              console.error('Server error:', data);
+              const errorData = await response.json().catch(() => null);
+              console.error('Server error:', errorData);
               const output: FlowOutput = {
                 nodeId: currentNode.id,
-                result: `Error: ${data.detail || 'Unknown error'}`,
+                result: `Error: ${errorData?.detail || 'Unknown error'}`,
                 error: true
               };
               setOutputs(prev => [...prev, output]);
               break;
             }
 
+            const data = await response.json();
+            console.log('Response data:', data);
+
             const output: FlowOutput = {
               nodeId: currentNode.id,
               result: data.result,
               error: data.error,
-              metadata: data.usage
+              metadata: {
+                ...data.usage,
+                structured_output: data.structured_output
+              }
             };
             setOutputs(prev => [...prev, output]);
 
-            if (!data.error) {
-              currentInput = data.result;
-            } else {
-              break;
-            }
+            // Store structured output for next agent
+            previousOutput = data.structured_output || null;
           }
 
           const outgoers = getOutgoers(currentNode, nodes, edges);
@@ -256,6 +315,70 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
       setOutputs([output]);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    try {
+      // First, filter valid agent nodes and extract their configs
+      const agentNodes = nodes.filter((node): node is Node<NodeData> & { data: { config: AgentConfig } } => 
+        node.type === 'agent' && 
+        node.data?.config !== undefined
+      );
+
+      // Transform the filtered nodes
+      const transformedNodes = agentNodes.map(node => ({
+        id: node.id,
+        type: node.type,
+        position: {
+          x: node.position.x,
+          y: node.position.y
+        },
+        config: {
+          label: node.data.config.label,
+          model_provider: node.data.config.modelProvider,
+          model_name: node.data.config.modelName,
+          temperature: node.data.config.temperature,
+          max_tokens: node.data.config.maxTokens,
+          system_prompts: node.data.config.systemPrompts.map(p => p.content),
+          response_tokens_limit: node.data.config.responseTokensLimit,
+          request_limit: node.data.config.requestLimit,
+          total_tokens_limit: node.data.config.totalTokensLimit,
+          output_structure: node.data.config.outputStructure,
+          selected_output_fields: node.data.config.selectedOutputFields
+        }
+      }));
+
+      const response = await fetch('http://localhost:8000/api/generate-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nodes: transformedNodes,
+          edges,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to generate code');
+      }
+
+      const { code } = await response.json();
+
+      // Create and download file
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'generated_flow.py';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error generating code:', error);
     }
   };
 
@@ -282,6 +405,25 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
         <Controls />
         <MiniMap />
       </ReactFlow>
+      
+      <Box
+        sx={{
+          position: 'absolute',
+          top: 20,
+          right: 20,
+          zIndex: 1000,
+        }}
+      >
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<CodeIcon />}
+          onClick={handleGenerateCode}
+          disabled={nodes.length === 0}
+        >
+          Generate Python Code
+        </Button>
+      </Box>
       
       <ResultsPanel outputs={outputs} isProcessing={isProcessing} />
       <InputPanel onSubmit={processInput} isProcessing={isProcessing} />
