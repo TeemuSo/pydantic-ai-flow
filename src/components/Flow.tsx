@@ -164,7 +164,6 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
           maxTokens: 2048,
           systemPrompts: [{ id: '1', content: '' }],
           responseTokensLimit: 2048,
-          requestLimit: 10,
           totalTokensLimit: 4096,
         } : undefined,
         onConfigChange: type === 'agent' 
@@ -225,17 +224,28 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
               google_api_key: apiKeys['google-gla'],
             };
 
-            // If we have previous output and selected fields, add them to the input
-            if (previousOutput && currentNode.data.config.selectedOutputFields?.length) {
-              const selectedData = currentNode.data.config.selectedOutputFields
-                .map(field => {
-                  // Use non-null assertion since we've checked it in the if condition
-                  const value = previousOutput![field];
-                  return `${field}: ${value !== undefined ? value : 'N/A'}`;
-                })
-                .join('\n');
-              currentInput = `${currentInput}\n\nContext from previous agent:\n${selectedData}`;
+            // Get system prompts
+            let systemPrompts = currentNode.data.config.systemPrompts
+              .filter(p => p.content.trim())
+              .map(p => p.content);
+
+            // If we have previous output, prepend it to the system prompts
+            if (previousOutput) {
+              const prevResult = typeof previousOutput === 'object' ? 
+                JSON.stringify(previousOutput, null, 2) : 
+                String(previousOutput);
+              
+              systemPrompts = systemPrompts.map(prompt => 
+                `Previous output:\n${prevResult}\n\n${prompt}`
+              );
             }
+
+            console.log('Debug - Final request data:', {
+              nodeId: currentNode.id,
+              input,
+              systemPrompts,
+              previousOutput
+            });
 
             const transformedConfig = {
               label: currentNode.data.config.label,
@@ -243,18 +253,12 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
               model_name: currentNode.data.config.modelName,
               temperature: currentNode.data.config.temperature,
               max_tokens: currentNode.data.config.maxTokens,
-              system_prompts: currentNode.data.config.systemPrompts.map(p => p.content).filter(Boolean),
+              system_prompts: systemPrompts,
               response_tokens_limit: currentNode.data.config.responseTokensLimit,
-              request_limit: currentNode.data.config.requestLimit,
               total_tokens_limit: currentNode.data.config.totalTokensLimit,
               output_structure: currentNode.data.config.outputStructure,
               selected_output_fields: currentNode.data.config.selectedOutputFields
             };
-
-            console.log('Starting processInput function');
-            console.log('Input:', currentInput);
-            console.log('Node config:', transformedConfig);
-            console.log('Credentials:', credentials);
 
             const response = await fetch('http://localhost:8000/api/run-agent', {
               method: 'POST',
@@ -264,7 +268,7 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
               body: JSON.stringify({
                 config: transformedConfig,
                 credentials,
-                prompt: currentInput,
+                prompt: input,
               }),
             });
 
@@ -298,6 +302,70 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
 
             // Store structured output for next agent
             previousOutput = data.structured_output || null;
+
+            // Update next node with previous output
+            const outgoers = getOutgoers(currentNode, nodes, edges);
+            if (outgoers.length > 0 && previousOutput) {
+              const selectedFields = currentNode.data.config.selectedOutputFields || [];
+              console.log('Passing data between agents:', {
+                from: currentNode.id,
+                to: outgoers[0].id,
+                availableFields: Object.keys(previousOutput),
+                selectedFields: selectedFields,
+              });
+
+              // Only pass selected fields
+              const filteredOutput = Object.fromEntries(
+                Object.entries(previousOutput)
+                  .filter(([key]) => selectedFields.includes(key))
+              );
+
+              // Log filtered output for debugging
+              console.log('Filtered output being passed:', {
+                selectedFields,
+                originalOutput: previousOutput,
+                filteredOutput,
+                fieldsCount: {
+                  original: Object.keys(previousOutput).length,
+                  filtered: Object.keys(filteredOutput).length,
+                  selected: selectedFields.length
+                }
+              });
+
+              if (Object.keys(filteredOutput).length === 0) {
+                console.log('Warning: No fields selected to pass to next agent');
+              }
+
+              setNodes(nds => 
+                nds.map(node => {
+                  if (node.id === outgoers[0].id && node.data?.config) {
+                    return {
+                      ...node,
+                      data: {
+                        ...node.data,
+                        previousAgentOutput: filteredOutput
+                      }
+                    };
+                  }
+                  return node;
+                })
+              );
+
+              // Save to localStorage after state update
+              setTimeout(() => {
+                localStorage.setItem('flowNodes', JSON.stringify(nodes));
+              }, 0);
+            }
+
+            // Log the input that will be sent to the next agent
+            if (outgoers.length > 0) {
+              console.log('Input prepared for next agent:', {
+                nodeId: outgoers[0].id,
+                input: currentInput,
+                previousAgentOutput: previousOutput,
+                selectedFields: currentNode.data?.config?.selectedOutputFields
+              });
+            }
           }
 
           const outgoers = getOutgoers(currentNode, nodes, edges);
@@ -342,7 +410,6 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
           max_tokens: node.data.config.maxTokens,
           system_prompts: node.data.config.systemPrompts.map(p => p.content),
           response_tokens_limit: node.data.config.responseTokensLimit,
-          request_limit: node.data.config.requestLimit,
           total_tokens_limit: node.data.config.totalTokensLimit,
           output_structure: node.data.config.outputStructure,
           selected_output_fields: node.data.config.selectedOutputFields
@@ -387,7 +454,8 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
       sx={{
         width: '100%',
         height: '100vh',
-        position: 'relative'
+        position: 'relative',
+        backgroundColor: '#fafafa'
       }}
     >
       <ReactFlow
@@ -400,18 +468,51 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
         onDrop={onDrop}
         nodeTypes={nodeTypes}
         fitView
+        minZoom={0.1}
+        maxZoom={1.5}
+        defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+        snapToGrid={true}
+        snapGrid={[15, 15]}
+        nodesDraggable={true}
+        nodesConnectable={true}
+        elementsSelectable={true}
+        selectNodesOnDrag={false}
+        panOnDrag={true}
+        zoomOnScroll={true}
+        zoomOnPinch={true}
+        panOnScroll={false}
+        preventScrolling={true}
       >
-        <Background />
-        <Controls />
-        <MiniMap />
+        <Background 
+          color="#e0e0e0"
+          gap={16}
+          size={1}
+          style={{ opacity: 0.3 }}
+        />
+        <Controls 
+          style={{
+            bottom: 100,
+            right: 8,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            padding: 4,
+            backgroundColor: 'rgba(255, 255, 255, 0.8)',
+            borderRadius: 4,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+          }}
+          showInteractive={false}
+        />
       </ReactFlow>
       
       <Box
         sx={{
           position: 'absolute',
-          top: 20,
-          right: 20,
+          top: 16,
+          right: 16,
           zIndex: 1000,
+          display: 'flex',
+          gap: 1
         }}
       >
         <Button
@@ -420,8 +521,17 @@ const Flow: React.FC<{ nodeTypes: any }> = ({ nodeTypes }) => {
           startIcon={<CodeIcon />}
           onClick={handleGenerateCode}
           disabled={nodes.length === 0}
+          size="small"
+          sx={{
+            backgroundColor: 'white',
+            color: 'primary.main',
+            boxShadow: 2,
+            '&:hover': {
+              backgroundColor: '#f5f5f5'
+            }
+          }}
         >
-          Generate Python Code
+          Export Code
         </Button>
       </Box>
       

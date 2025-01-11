@@ -55,7 +55,6 @@ class AgentConfig(BaseModel):
     max_tokens: int
     system_prompts: List[str]
     response_tokens_limit: int
-    request_limit: int
     total_tokens_limit: int
     output_structure: Optional[OutputStructure] = None
     selected_output_fields: Optional[List[str]] = None
@@ -164,7 +163,6 @@ async def run_agent(request: AgentRunRequest) -> AgentRunResponse:
                 "temperature": request.config.temperature,
                 "max_tokens": request.config.max_tokens,
                 "response_tokens_limit": request.config.response_tokens_limit,
-                "request_limit": request.config.request_limit,
                 "total_tokens_limit": request.config.total_tokens_limit
             }
         )
@@ -317,7 +315,6 @@ def generate_python_code(nodes: List[FlowNode], edges: List[FlowEdge]) -> str:
                 f"            'temperature': {node.config.temperature},",
                 f"            'max_tokens': {node.config.maxTokens},",
                 f"            'response_tokens_limit': {node.config.responseTokensLimit},",
-                f"            'request_limit': {node.config.requestLimit},",
                 f"            'total_tokens_limit': {node.config.totalTokensLimit}",
                 "        }",
                 "    ).data",

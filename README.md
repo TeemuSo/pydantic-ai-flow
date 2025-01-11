@@ -24,6 +24,17 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
   - Configure which output fields to pass to next agent
   - Sequential execution of agent chain
   - Full conversation history maintained through the chain
+  - Visual indicators for data flow between agents
+  - Hover-to-view detailed data passing information
+  - Persistent field selection between runs
+
+- **Data Flow Visualization**:
+  - Green indicator bar shows received input fields
+  - Hover over indicator to see detailed field values
+  - Clear visual selection of fields to pass forward
+  - Real-time preview of selected field values
+  - Automatic persistence of selected fields
+  - Visual confirmation of data passing between agents
 
 - **Structured Outputs**:
   - Define custom output structures using Pydantic models
@@ -31,6 +42,8 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
   - Field descriptions for better documentation
   - Real-time validation of structured outputs
   - Visual output field selection
+  - Preview of field values before passing
+  - Selective field passing between agents
 
 - **Code Generation**:
   - Export flows as runnable Python code
@@ -139,7 +152,16 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
    - See structured outputs and raw responses
    - Selected fields are automatically passed to next agent
 
-5. **Generating Python Code**:
+5. **Managing Data Flow Between Agents**:
+   - After an agent runs, its output fields appear in a selection panel
+   - Check the fields you want to pass to the next agent
+   - Hover over fields to preview their values
+   - Selected fields appear in a green indicator on the next agent
+   - Hover over the green indicator to view received values
+   - Field selections persist between runs
+   - Each agent shows its received input data for transparency
+
+6. **Generating Python Code**:
    - Click "Generate Python Code" button
    - Download the generated Python script
    - The script includes:
@@ -148,7 +170,7 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
      - Flow execution logic
      - Can be run independently of the UI
 
-6. **Managing the Workspace**:
+7. **Managing the Workspace**:
    - All changes are automatically saved
    - Workspace persists between sessions
    - Clear workspace by removing all nodes

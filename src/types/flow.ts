@@ -22,18 +22,18 @@ export interface AgentConfig {
   maxTokens: number;
   systemPrompts: SystemPrompt[];
   responseTokensLimit: number;
-  requestLimit: number;
   totalTokensLimit: number;
-  dependencyType?: string;
-  resultType?: string;
   outputStructure?: OutputStructure;
   selectedOutputFields?: string[];
+  receivedInput?: StructuredOutput;
 }
 
 export interface NodeData {
+  id?: string;
   type: string;
   config?: AgentConfig;
   onConfigChange?: (config: AgentConfig) => void;
+  previousAgentOutput?: StructuredOutput;
 }
 
 // Record type for structured output where values can be any primitive type
