@@ -8,15 +8,18 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
   - Drag-and-drop interface built with React Flow
   - Persistent workspace - nodes and connections are saved automatically
   - Real-time configuration updates
+  - Collapsible configuration panels for cleaner workspace
+  - Improved visual design with better spacing and layout
 
 - **Agent Configuration**:
   - Multiple model providers support (OpenAI, Anthropic, Google)
-  - Pre-configured default settings for quick setup
+  - Streamlined model selection with combined provider/model dropdown
+  - Basic and advanced settings separation for better UX
   - Temperature and token limit controls
-  - Multiple system prompts support
-  - Usage limits configuration
+  - Multiple system prompts support with improved UI
   - Custom output structure definition using Pydantic models
   - Field selection for inter-agent communication
+  - Tooltips and visual feedback for better usability
 
 - **Multi-Agent Workflows**:
   - Chain multiple agents together
@@ -24,17 +27,18 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
   - Configure which output fields to pass to next agent
   - Sequential execution of agent chain
   - Full conversation history maintained through the chain
-  - Visual indicators for data flow between agents
-  - Hover-to-view detailed data passing information
+  - Enhanced visual indicators for data flow between agents
+  - Improved hover-to-view detailed data passing information
   - Persistent field selection between runs
 
 - **Data Flow Visualization**:
-  - Green indicator bar shows received input fields
-  - Hover over indicator to see detailed field values
+  - Enhanced input data visualization with detailed field values
+  - Improved visual indicators for data passing between agents
   - Clear visual selection of fields to pass forward
   - Real-time preview of selected field values
   - Automatic persistence of selected fields
   - Visual confirmation of data passing between agents
+  - Collapsible sections for better workspace organization
 
 - **Structured Outputs**:
   - Define custom output structures using Pydantic models
@@ -133,33 +137,37 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 2. **Creating a Workflow**:
    - Drag agent nodes from the sidebar onto the canvas
    - Connect nodes by dragging between connection points
-   - Configure each agent's settings:
-     - Model provider and version
-     - Temperature and token limits
-     - System prompts
-     - Output structure and fields
+   - Configure each agent's settings by clicking the gear icon:
+     - Basic settings:
+       - Agent name
+       - Model selection (combined provider/model dropdown)
+       - System prompts
+     - Advanced settings (optional):
+       - Temperature and token limits
+       - Output structure configuration
+       - Field selection for data passing
 
 3. **Configuring Output Structures**:
-   - Define the structure name (e.g., "UserProfile")
+   - In advanced settings, define the structure name (e.g., "UserProfile")
    - Add fields with types (string, int, float, bool, etc.)
    - Add optional field descriptions
    - Select which fields to pass to next agent
+   - Preview structured output in a collapsible panel
 
 4. **Running the Workflow**:
-   - Type your message in the input panel
-   - Click send or press Enter
-   - View results in the results panel
+   - Click the play button on any agent node
+   - Enter your message in the dialog
+   - View results in the collapsible output panel
    - See structured outputs and raw responses
    - Selected fields are automatically passed to next agent
 
 5. **Managing Data Flow Between Agents**:
-   - After an agent runs, its output fields appear in a selection panel
-   - Check the fields you want to pass to the next agent
-   - Hover over fields to preview their values
-   - Selected fields appear in a green indicator on the next agent
-   - Hover over the green indicator to view received values
+   - Input data is clearly visible at the top of each agent node
+   - Hover over input data to see detailed field values
+   - Select output fields in the advanced settings panel
+   - Preview selected fields before passing to next agent
    - Field selections persist between runs
-   - Each agent shows its received input data for transparency
+   - Collapsible panels keep the workspace clean
 
 6. **Generating Python Code**:
    - Click "Generate Python Code" button
@@ -177,13 +185,16 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 
 ## Development
 
-- Uses TypeScript for type safety
-- Material-UI components for consistent styling
-- React Flow handles graph visualization
-- Custom node types in `components/nodes`
-- Persistent storage using localStorage
+- Uses TypeScript for type safety and improved type definitions
+- Material-UI components with enhanced styling and animations
+- React Flow handles graph visualization with custom node designs
+- Custom node types with collapsible configuration panels
+- Persistent storage using localStorage for all settings
 - FastAPI backend for agent execution
 - Pydantic models for structured data
+- Improved state management for data flow between agents
+- Enhanced error handling and user feedback
+- Optimized rendering with React hooks
 
 ## Future Enhancements
 
@@ -194,4 +205,8 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 - [ ] Import/Export workflow configurations
 - [ ] Real-time collaboration features
 - [ ] Custom tool integration
-- [ ] Flow versioning and history 
+- [ ] Flow versioning and history
+- [ ] Drag-and-drop system prompt templates
+- [ ] Advanced output structure templates
+- [ ] Visual flow validation and debugging
+- [ ] Enhanced data visualization for complex outputs 
