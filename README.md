@@ -7,8 +7,16 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 - **Visual Node Editor**: Drag-and-drop interface built with React Flow
 - **Component Types**:
   - Agent Nodes: Represent AI agents that can perform tasks
+    - Configurable model settings (OpenAI, Anthropic, Google)
+    - Temperature and token limit controls
+    - Multiple system prompts support
+    - Usage limits configuration
   - Tool Nodes: Represent tools or functions that agents can use
   - Result Nodes: Represent output or completion states
+- **Interactive UI**:
+  - Dedicated drag handles for better node manipulation
+  - Real-time configuration updates
+  - Type-safe implementation
 
 ## Project Structure
 
@@ -19,9 +27,9 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 ├── src/                # Source code
 │   ├── components/     # React components
 │   │   ├── nodes/     # Custom node components
-│   │   │   ├── AgentNode.tsx
-│   │   │   ├── ToolNode.tsx
-│   │   │   └── ResultNode.tsx
+│   │   │   ├── AgentNode.tsx   # Agent configuration component
+│   │   │   ├── ToolNode.tsx    # Tool definition component
+│   │   │   └── ResultNode.tsx  # Result handling component
 │   │   ├── Flow.tsx   # Main flow canvas
 │   │   └── Sidebar.tsx # Component sidebar
 │   ├── App.tsx        # Root component
@@ -55,10 +63,27 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 
 ## Usage
 
-1. **Adding Nodes**: Drag components from the sidebar onto the canvas
-2. **Connecting Nodes**: Click and drag from one node's handle to another to create connections
-3. **Moving Nodes**: Click and drag nodes to reposition them
-4. **Deleting**: Select nodes or edges and press delete/backspace
+1. **Adding Nodes**: 
+   - Drag components from the sidebar onto the canvas
+   - Each node type has specific configuration options
+
+2. **Configuring Agent Nodes**:
+   - Select model provider (OpenAI, Anthropic, Google)
+   - Choose specific model version
+   - Adjust temperature (0-2) and token limits
+   - Add/remove system prompts
+   - Set usage limits for responses and requests
+   - Configure optional dependency and result types
+
+3. **Moving Nodes**: 
+   - Use the dedicated drag handle at the top of each node
+   - Click and drag nodes to reposition them
+
+4. **Connecting Nodes**: 
+   - Click and drag from one node's handle to another to create connections
+
+5. **Deleting**: 
+   - Select nodes or edges and press delete/backspace
 
 ## Development
 
@@ -66,11 +91,14 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 - Components are built using Material-UI for consistent styling
 - React Flow handles the graph visualization and interactions
 - Custom node types are defined in the `components/nodes` directory
+- Type-safe implementations for all configurations
 
 ## Future Enhancements
 
 - [ ] Save/Load workflow configurations
 - [ ] Export workflows to Python code
-- [ ] Custom node configuration panels
 - [ ] Validation of workflow connections
-- [ ] Integration with Pydantic model definitions 
+- [ ] Integration with Pydantic model definitions
+- [ ] Advanced model configuration options
+- [ ] Custom tool configuration interface
+- [ ] Workflow testing and debugging tools 
