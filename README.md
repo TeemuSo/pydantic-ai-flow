@@ -76,11 +76,18 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 
 ```
 @tools/
-├── public/              # Static files
-│   └── index.html      # HTML template
-├── src/                # Source code
-│   ├── components/     # React components
-│   │   ├── nodes/     # Custom node components
+├── backend/            # Python FastAPI backend
+│   ├── server.py      # Main server implementation
+│   ├── api.py         # API endpoints
+│   ├── models.py      # Data models
+│   ├── agents.py      # Agent implementations
+│   ├── tools.py       # Tool implementations
+│   └── requirements.txt # Python dependencies
+├── public/            # Static files
+│   └── index.html    # HTML template
+├── src/              # Frontend source code
+│   ├── components/   # React components
+│   │   ├── nodes/   # Custom node components
 │   │   │   ├── AgentNode.tsx    # Agent configuration component
 │   │   │   ├── ToolNode.tsx     # Tool definition component
 │   │   │   └── ResultNode.tsx   # Result handling component
@@ -89,12 +96,112 @@ A drag-and-drop interface for building agentic workflows using Pydantic LLM comp
 │   │   ├── ResultsPanel.tsx    # Results display component
 │   │   ├── APIKeyConfig.tsx    # API key management
 │   │   └── Sidebar.tsx         # Component sidebar
-│   ├── types/         # TypeScript type definitions
-│   ├── App.tsx        # Root component
-│   └── index.tsx      # Entry point
-├── package.json       # Dependencies and scripts
-└── tsconfig.json     # TypeScript configuration
+│   ├── types/       # TypeScript type definitions
+│   ├── App.tsx      # Root component
+│   └── index.tsx    # Entry point
+├── package.json     # Frontend dependencies and scripts
+└── tsconfig.json   # TypeScript configuration
 ```
+
+## Installation & Setup
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- Python (3.10 or higher)
+- npm or yarn package manager
+
+Required Python packages (installed automatically via requirements.txt):
+- pydantic-ai (>= 0.0.1)
+- fastapi (>= 0.104.0)
+- uvicorn (>= 0.24.0)
+- httpx (>= 0.24.0)
+- pydantic (>= 2.0.0)
+
+### Backend Setup
+
+1. Navigate to the backend directory:
+   ```bash
+   cd backend
+   ```
+
+2. Create and activate a Python virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+   ```
+
+3. Install Python dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. Start the backend server:
+   ```bash
+   python server.py
+   ```
+   The backend will be available at `http://localhost:8000`
+
+### Frontend Setup
+
+1. Navigate to the project root directory:
+   ```bash
+   cd @tools  # If you're in the backend directory, first do: cd ..
+   ```
+
+2. Install frontend dependencies:
+   ```bash
+   npm install
+   # or if using yarn
+   yarn install
+   ```
+
+3. Start the development server:
+   ```bash
+   npm start
+   # or if using yarn
+   yarn start
+   ```
+   The application will be available at `http://localhost:3000`
+
+### API Keys Setup
+
+Before using the application, you'll need to configure your API keys:
+
+1. Open the application in your browser
+2. Click the settings icon in the top right corner
+3. Enter your API keys for the providers you want to use:
+   - OpenAI API Key
+   - Anthropic API Key (optional)
+   - Google API Key (optional)
+
+### Verifying the Setup
+
+1. Check that both servers are running:
+   - Frontend: `http://localhost:3000` should show the application UI
+   - Backend: `http://localhost:8000/docs` should show the FastAPI documentation
+
+2. Create a simple test flow:
+   - Drag an agent node onto the canvas
+   - Configure it with your API key
+   - Try running a simple prompt to verify everything is working
+
+### Troubleshooting
+
+- If the backend fails to start, check:
+  - Python version compatibility
+  - All dependencies are installed
+  - No other service is using port 8000
+
+- If the frontend fails to start, check:
+  - Node.js version compatibility
+  - npm/yarn installation
+  - No other service is using port 3000
+
+- If agent execution fails:
+  - Verify API keys are correctly configured
+  - Check backend console for error messages
+  - Ensure backend is running and accessible
 
 ## Technology Stack
 
