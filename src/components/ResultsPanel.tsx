@@ -103,7 +103,9 @@ export const ResultsPanel: React.FC<ResultsPanelProps> = ({ outputs, isProcessin
                             <Typography variant="body2" color="text.secondary">
                               {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:
                             </Typography>
-                            <Typography variant="body2">{value}</Typography>
+                            <Typography variant="body2">
+                              {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                            </Typography>
                           </Box>
                         ))}
                       </Stack>
